@@ -76,6 +76,7 @@ let lastMood="neutral";
 let avatarStyle=0;
 let micEnabled=true;
 let darkTheme=true;
+let avatarInterval;
 
 // ---------------- INIT CAMERA & AUDIO ----------------
 async function initCamera(){
@@ -109,42 +110,41 @@ cameraMP.start();
 // ---------------- AVATAR DRAWING ----------------
 avatarCanvas.width=500; avatarCanvas.height=500;
 function drawAvatar(mouthOpen=0, mood="neutral"){
-  ctx.clearRect(0,0,avatarCanvas.width,avatarCanvas.height);
-  // Head centered
-  ctx.fillStyle="#f5cba7"; ctx.beginPath(); ctx.arc(250,250,120,0,Math.PI*2); ctx.fill();
-  // Eyes
-  const eyeHeight = mood==="happy"?10:15;
-  ctx.fillStyle="#000"; ctx.beginPath(); ctx.ellipse(200,220,15,eyeHeight,0,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(300,220,15,eyeHeight,0,0,Math.PI*2); ctx.fill();
-  // Mouth
-  ctx.fillStyle="#900"; ctx.beginPath();
-  if(mood==="happy") ctx.ellipse(250,320,60,mouthOpen*1.2,0,0,Math.PI*2);
-  else if(mood==="sad") ctx.ellipse(250,330,60,mouthOpen*0.5,0,0,Math.PI*2);
-  else ctx.ellipse(250,320,60,mouthOpen,0,0,Math.PI*2);
-  ctx.fill();
+    ctx.clearRect(0,0,avatarCanvas.width,avatarCanvas.height);
+    // Head
+    ctx.fillStyle="#f5cba7"; ctx.beginPath(); ctx.arc(250,250,120,0,Math.PI*2); ctx.fill();
+    // Eyes
+    const eyeHeight = mood==="happy"?10:15;
+    ctx.fillStyle="#000"; ctx.beginPath(); ctx.ellipse(200,220,15,eyeHeight,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(300,220,15,eyeHeight,0,0,Math.PI*2); ctx.fill();
+    // Mouth
+    ctx.fillStyle="#900"; ctx.beginPath();
+    const mouthSize = Math.min(Math.max(mouthOpen, 10), 60);
+    ctx.ellipse(250,320,60, mouthSize,0,0,Math.PI*2);
+    ctx.fill();
 }
 
 // ---------------- FACE RESULTS & MOOD ----------------
 function onFaceResults(results){
-  if(avatarMode) return;
-  ctx.clearRect(0,0,avatarCanvas.width,avatarCanvas.height);
-  if(results.multiFaceLandmarks && results.multiFaceLandmarks.length>0){
-    const lm = results.multiFaceLandmarks[0];
-    const upperLip = lm[13]; const lowerLip = lm[14];
-    const mouthOpen = Math.hypot((upperLip.x-lowerLip.x)*avatarCanvas.width,(upperLip.y-lowerLip.y)*avatarCanvas.height);
-    const leftMouth=lm[61]; const rightMouth=lm[291];
-    const smileDist=Math.hypot((leftMouth.x-rightMouth.x)*avatarCanvas.width,(leftMouth.y-rightMouth.y)*avatarCanvas.height);
-    const leftEyebrow=lm[105]; const leftEye=lm[33];
-    const browDist=(leftEyebrow.y-leftEye.y)*avatarCanvas.height;
+    if(avatarMode) return;
+    ctx.clearRect(0,0,avatarCanvas.width,avatarCanvas.height);
+    if(results.multiFaceLandmarks && results.multiFaceLandmarks.length>0){
+        const lm = results.multiFaceLandmarks[0];
+        const upperLip = lm[13]; const lowerLip = lm[14];
+        const mouthOpen = Math.hypot((upperLip.x-lowerLip.x)*avatarCanvas.width,(upperLip.y-lowerLip.y)*avatarCanvas.height);
+        const leftMouth=lm[61]; const rightMouth=lm[291];
+        const smileDist=Math.hypot((leftMouth.x-rightMouth.x)*avatarCanvas.width,(leftMouth.y-rightMouth.y)*avatarCanvas.height);
+        const leftEyebrow=lm[105]; const leftEye=lm[33];
+        const browDist=(leftEyebrow.y-leftEye.y)*avatarCanvas.height;
 
-    if(smileDist>45) lastMood="happy";
-    else if(browDist<-5) lastMood="angry";
-    else if(mouthOpen>8 && smileDist<35) lastMood="sad";
-    else lastMood="neutral";
+        if(smileDist>45) lastMood="happy";
+        else if(browDist<-5) lastMood="angry";
+        else if(mouthOpen>8 && smileDist<35) lastMood="sad";
+        else lastMood="neutral";
 
-    ctx.strokeStyle="#00fff7"; ctx.lineWidth=4; ctx.strokeRect(50,50,400,400);
-    ctx.fillStyle="rgba(0,255,255,0.1)"; ctx.fillRect(50,50,400,400);
-  }
+        ctx.strokeStyle="#00fff7"; ctx.lineWidth=4; ctx.strokeRect(50,50,400,400);
+        ctx.fillStyle="rgba(0,255,255,0.1)"; ctx.fillRect(50,50,400,400);
+    }
 }
 
 // ---------------- SPEAK FUNCTION ----------------
@@ -156,35 +156,51 @@ function speak(text){
 
 // ---------------- BUTTONS ----------------
 talkBtn.addEventListener('click',()=>{
-  avatarMode=true;
-  avatarCanvas.style.display="block";
-  liveVideo.style.display="none";
+    avatarMode=true;
+    avatarCanvas.style.display="block";
+    liveVideo.style.display="none";
 
-  const anim=setInterval(()=>{
-    let amp=30;
-    if(micEnabled){
-      window.audioAnalyser.getByteTimeDomainData(window.dataArray);
-      amp = window.dataArray.reduce((a,v)=>a+Math.abs(v-128),0)/window.dataArray.length;
-    }
-    drawAvatar(amp*0.5,lastMood);
-  },50);
+    if(avatarInterval) clearInterval(avatarInterval);
 
-  const reactions={happy:"Haha! You look so happy 😎", sad:"Oh no! Stay strong 💪", angry:"Take a deep breath 😤", neutral:"Got it! 😐"};
-  const reactionText = reactions[lastMood] || reactions["neutral"];
-  chatOutput.innerHTML += `<div class="bot-msg">Avatar: ${reactionText}</div>`;
-  chatOutput.scrollTop=chatOutput.scrollHeight;
-  speak(reactionText);
+    avatarInterval = setInterval(()=>{
+        let amp = 30;
+        if(micEnabled && window.audioAnalyser){
+            window.audioAnalyser.getByteTimeDomainData(window.dataArray);
+            amp = window.dataArray.reduce((a,v)=>a+Math.abs(v-128),0)/window.dataArray.length;
+        }
+        drawAvatar(amp*1.5, lastMood);
+    },50);
+
+    const reactions={happy:"Haha! You look so happy 😎", sad:"Oh no! Stay strong 💪", angry:"Take a deep breath 😤", neutral:"Got it! 😐"};
+    const reactionText = reactions[lastMood] || reactions["neutral"];
+    chatOutput.innerHTML += `<div class="bot-msg">Avatar: ${reactionText}</div>`;
+    chatOutput.scrollTop=chatOutput.scrollHeight;
+    speak(reactionText);
 });
 
-resetBtn.addEventListener('click',()=>{avatarMode=false; avatarCanvas.style.display="none"; liveVideo.style.display="block";});
-moodBtn.addEventListener('click',()=>{chatOutput.innerHTML+=`<div class="bot-msg">Mood Detected: ${lastMood}</div>`; chatOutput.scrollTop=chatOutput.scrollHeight;});
-memeBtn.addEventListener('click',()=>{const memes=["😎 Cool Meme!","😂 Haha Meme!","🤯 Mind-blown Meme!"]; chatOutput.innerHTML+=`<div class="bot-msg">Avatar: ${memes[Math.floor(Math.random()*memes.length)]}</div>`; chatOutput.scrollTop=chatOutput.scrollHeight;});
+resetBtn.addEventListener('click',()=>{
+    avatarMode=false;
+    avatarCanvas.style.display="none";
+    liveVideo.style.display="block";
+    if(avatarInterval) clearInterval(avatarInterval);
+});
+
+moodBtn.addEventListener('click',()=>{
+    chatOutput.innerHTML+=`<div class="bot-msg">Mood Detected: ${lastMood}</div>`;
+    chatOutput.scrollTop=chatOutput.scrollHeight;
+});
+
+memeBtn.addEventListener('click',()=>{
+    const memes=["😎 Cool Meme!","😂 Haha Meme!","🤯 Mind-blown Meme!"];
+    chatOutput.innerHTML+=`<div class="bot-msg">Avatar: ${memes[Math.floor(Math.random()*memes.length)]}</div>`;
+    chatOutput.scrollTop=chatOutput.scrollHeight;
+});
+
 styleBtn.addEventListener('click',()=>{avatarStyle=(avatarStyle+1)%2; lastMood=avatarStyle===0?"neutral":"happy";});
 micBtn.addEventListener('click',()=>{micEnabled=!micEnabled;});
 themeBtn.addEventListener('click',()=>{darkTheme=!darkTheme; document.body.style.background=darkTheme?"#0d0d0d":"#eee"; document.body.style.color=darkTheme?"#fff":"#000";});
 clearBtn.addEventListener('click',()=>{chatOutput.innerHTML="";});
 
 </script>
-
 </body>
 </html>
