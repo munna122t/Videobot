@@ -3,110 +3,162 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Video Avatar Reaction Bot</title>
+<title>Futuristic Avatar Reaction Bot</title>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface"></script>
 <style>
-body { font-family: Arial; background: #1e1e1e; color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px;}
-h1 { font-size: 28px; margin-bottom: 10px; }
-#video-demo, #avatar-video { border-radius: 12px; background: black; margin-bottom: 10px;}
-#chat-output { background: #333; padding: 10px; width: 100%; max-width: 600px; min-height: 100px; border-radius: 8px; overflow-y: auto; font-size: 20px; }
-button { padding: 10px 15px; font-size: 18px; border-radius: 8px; cursor: pointer; border: none; background-color: #4caf50; color: #fff; }
+/* ----------------- GLOBAL ----------------- */
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Arial', sans-serif; }
+body, html { height: 100%; background: #0d0d0d; color: #fff; overflow: hidden; }
+button { cursor: pointer; border: none; border-radius: 8px; font-size: 20px; transition: 0.3s; }
+button:hover { opacity: 0.9; }
+/* ----------------- CONTAINER ----------------- */
+.container { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
+/* ----------------- HEADER ----------------- */
+header { text-align: center; padding: 15px; font-size: 32px; color: #00fff7; text-shadow: 0 0 8px #00fff7; }
+/* ----------------- MAIN ----------------- */
+.main { display: flex; flex: 1; overflow: hidden; }
+.avatar-section { flex: 1; display: flex; justify-content: center; align-items: center; position: relative; }
+#avatar-canvas { border-radius: 20px; background: #111; box-shadow: 0 0 20px #00fff7; }
+/* ----------------- CHAT ----------------- */
+.chat-section { flex: 1; display: flex; flex-direction: column; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); padding: 15px; }
+#chat-output { flex: 1; overflow-y: auto; border-radius: 12px; background: rgba(30,30,30,0.8); padding: 10px; font-size: 25px; margin-bottom: 10px; }
+#user-input { font-size: 25px; padding: 10px; border-radius: 8px; border: none; margin-bottom: 10px; width: 100%; background: #222; color: #fff; }
+#send-btn, #analyze-btn { background: #00fff7; color: #000; padding: 12px 20px; margin-bottom: 10px; font-weight: bold; }
+/* Chat messages */
+.user-msg { color: #4caf50; margin-bottom: 5px; }
+.bot-msg { color: #fff; margin-bottom: 5px; }
 </style>
 </head>
 <body>
 
-<h1>Avatar Reaction Bot Demo</h1>
+<div class="container">
+  <header>Futuristic Avatar Mentor 🤖</header>
 
-<input type="file" id="video-upload" accept="video/*" />
-<video id="video-demo" width="400" height="300" controls></video>
-<canvas id="avatar-video" width="400" height="300"></canvas>
+  <div class="main">
+    <!-- Avatar -->
+    <div class="avatar-section">
+      <canvas id="avatar-canvas" width="450" height="450"></canvas>
+    </div>
 
-<div id="chat-output"></div>
-<button id="analyze-btn">Analyze & React</button>
+    <!-- Chat -->
+    <div class="chat-section">
+      <input type="file" id="video-upload" accept="video/*" />
+      <video id="video-demo" width="100%" style="border-radius:12px;margin:10px 0;" controls></video>
+      <textarea id="user-input" placeholder="Type a question or comment..." rows="2"></textarea>
+      <button id="send-btn">Send</button>
+      <button id="analyze-btn">Analyze & React</button>
+      <div id="chat-output"></div>
+    </div>
+  </div>
+</div>
 
 <script>
-// Elements
 const videoUpload = document.getElementById('video-upload');
 const videoDemo = document.getElementById('video-demo');
-const avatarCanvas = document.getElementById('avatar-video');
+const avatarCanvas = document.getElementById('avatar-canvas');
 const ctx = avatarCanvas.getContext('2d');
 const chatOutput = document.getElementById('chat-output');
 const analyzeBtn = document.getElementById('analyze-btn');
+const sendBtn = document.getElementById('send-btn');
+const userInput = document.getElementById('user-input');
 
 let uploadedVideo = null;
 
-// Load video
-videoUpload.addEventListener('change', (e) => {
+// ---------------- VIDEO UPLOAD ----------------
+videoUpload.addEventListener('change', (e)=>{
   const file = e.target.files[0];
-  if (file) {
+  if(file){
     const url = URL.createObjectURL(file);
     videoDemo.src = url;
     uploadedVideo = file;
   }
 });
 
-// Simple avatar drawing (lips move with speech)
-function drawAvatar(mouthOpen = 0) {
+// ---------------- AVATAR DRAWING ----------------
+function drawAvatar(mouthOpen=0){
   ctx.clearRect(0,0,avatarCanvas.width,avatarCanvas.height);
   // Head
-  ctx.fillStyle = "#f5cba7";
+  ctx.fillStyle="#f5cba7";
   ctx.beginPath();
-  ctx.arc(200,150,100,0,Math.PI*2);
+  ctx.arc(225,225,120,0,Math.PI*2);
   ctx.fill();
   // Eyes
-  ctx.fillStyle = "#000";
-  ctx.beginPath(); ctx.arc(160,120,10,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(240,120,10,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle="#000";
+  ctx.beginPath(); ctx.arc(175,180,15,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(275,180,15,0,Math.PI*2); ctx.fill();
   // Mouth
-  ctx.fillStyle = "#900";
+  ctx.fillStyle="#900";
   ctx.beginPath();
-  ctx.ellipse(200,200,50,mouthOpen,0,0,Math.PI*2);
+  ctx.ellipse(225,300,60,mouthOpen,0,0,Math.PI*2);
   ctx.fill();
 }
 
-// Simulated speech recognition + mood detection
-async function analyzeVideo() {
-  if (!uploadedVideo) return alert("Upload a video first!");
-  
-  chatOutput.innerHTML += `<div style="color:#4caf50;">Analyzing video...</div>`;
-  
-  // Dummy speech-to-text (replace with real Whisper/Google STT)
-  const detectedText = "I am feeling happy and excited!";
-  chatOutput.innerHTML += `<div>Detected Speech: ${detectedText}</div>`;
-  
-  // Dummy mood detection (replace with real emotion model)
-  const moods = ["happy", "sad", "angry", "neutral"];
+// ---------------- BOT LOGIC ----------------
+const predefinedResponses = {
+  "hi":"Hello! I am your futuristic mentor 😎",
+  "how are you":"I am observing your vibes through video! 😎",
+  "hackathon":"This bot is a futuristic demo for hackathons!",
+  "what is ai":"AI = machines that think & learn.",
+  "bye":"Goodbye! Come back soon 👋"
+};
+
+// ---------------- SEND USER MESSAGE ----------------
+sendBtn.addEventListener('click', ()=>{
+  const text = userInput.value.trim().toLowerCase();
+  if(!text) return;
+  chatOutput.innerHTML += `<div class="user-msg">You: ${text}</div>`;
+  userInput.value="";
+  const reply = predefinedResponses[text] || "Hmm, I need to learn that 😅";
+  chatOutput.innerHTML += `<div class="bot-msg">Avatar: ${reply}</div>`;
+  chatOutput.scrollTop = chatOutput.scrollHeight;
+  // Avatar speaks
+  const speech = new SpeechSynthesisUtterance(reply);
+  speech.lang="en-US"; speech.rate=1; speech.pitch=1;
+  speechSynthesis.speak(speech);
+});
+
+// Press Enter to send
+userInput.addEventListener("keypress", (e)=>{
+  if(e.key==="Enter"){ e.preventDefault(); sendBtn.click(); }
+});
+
+// ---------------- ANALYZE & REACT ----------------
+analyzeBtn.addEventListener('click', async ()=>{
+  if(!uploadedVideo) return alert("Upload a video first!");
+  chatOutput.innerHTML += `<div class="bot-msg">Analyzing video...</div>`;
+
+  // Dummy speech recognition + mood detection
+  const detectedText = "I am feeling excited and happy!";
+  const moods = ["happy","sad","angry","neutral"];
   const detectedMood = moods[Math.floor(Math.random()*moods.length)];
-  chatOutput.innerHTML += `<div>Detected Mood: ${detectedMood}</div>`;
-  
-  // Avatar reacts
-  const reactionMap = {
-    happy: "Haha! I love your vibe 😎",
-    sad: "Oh no! Don't worry, stay strong 💪",
-    angry: "Take a deep breath 😤",
-    neutral: "Okay, got it! 😐"
+  chatOutput.innerHTML += `<div class="user-msg">Detected Speech: ${detectedText}</div>`;
+  chatOutput.innerHTML += `<div class="bot-msg">Detected Mood: ${detectedMood}</div>`;
+
+  const reactions = {
+    happy:"Haha! I love your energy 😎",
+    sad:"Oh no! Stay strong 💪",
+    angry:"Take a deep breath 😤",
+    neutral:"Got it! 😐"
   };
-  const reactionText = reactionMap[detectedMood];
-  
-  // Animate avatar lips
+  const reactionText = reactions[detectedMood];
+
+  // Animate avatar lips while speaking
   let mouthOpen = 0;
-  const anim = setInterval(() => {
+  const anim = setInterval(()=>{
     drawAvatar(mouthOpen);
-    mouthOpen = mouthOpen === 0 ? 30 : 0;
-  }, 400);
-  
+    mouthOpen = mouthOpen===0?30:0;
+  },400);
+
   // Speak reaction
   const speech = new SpeechSynthesisUtterance(reactionText);
-  speech.lang = "en-US"; speech.rate=1; speech.pitch=1;
+  speech.lang="en-US"; speech.rate=1; speech.pitch=1;
   speechSynthesis.speak(speech);
-  speech.onend = () => clearInterval(anim);
-  
-  chatOutput.innerHTML += `<div>Avatar: ${reactionText}</div>`;
-  chatOutput.scrollTop = chatOutput.scrollHeight;
-}
+  speech.onend = ()=> clearInterval(anim);
 
-analyzeBtn.addEventListener('click', analyzeVideo);
+  chatOutput.innerHTML += `<div class="bot-msg">Avatar: ${reactionText}</div>`;
+  chatOutput.scrollTop = chatOutput.scrollHeight;
+});
 </script>
 
 </body>
