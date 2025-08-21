@@ -1,151 +1,113 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Real-Time Talking Avatar Bot</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #1e1e1e;
-      color: #fff;
-      display: flex;
-      justify-content: center;
-      padding: 20px;
-    }
-
-    .container {
-      max-width: 800px;
-      width: 100%;
-    }
-
-    h1 {
-      text-align: center;
-      font-size: 30px;
-      margin-bottom: 20px;
-    }
-
-    .avatar-section {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-
-    #avatar-video {
-      width: 400px;
-      border-radius: 12px;
-      background: black;
-    }
-
-    .chat-section {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    #user-input {
-      font-size: 20px;
-      padding: 10px;
-      border-radius: 8px;
-      border: none;
-      width: 100%;
-    }
-
-    #send-btn {
-      font-size: 20px;
-      padding: 10px;
-      background-color: #4caf50;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-
-    #chat-output {
-      font-size: 20px;
-      min-height: 100px;
-      padding: 10px;
-      border-radius: 8px;
-      background-color: #333;
-      overflow-y: auto;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Avatar Reaction Bot</title>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface"></script>
+<style>
+body { font-family: Arial; background: #1e1e1e; color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px;}
+h1 { font-size: 28px; margin-bottom: 10px; }
+#video-demo, #avatar-video { border-radius: 12px; background: black; margin-bottom: 10px;}
+#chat-output { background: #333; padding: 10px; width: 100%; max-width: 600px; min-height: 100px; border-radius: 8px; overflow-y: auto; font-size: 20px; }
+button { padding: 10px 15px; font-size: 18px; border-radius: 8px; cursor: pointer; border: none; background-color: #4caf50; color: #fff; }
+</style>
 </head>
 <body>
-  <div class="container">
-    <h1>Real-Time Talking Avatar Mentor</h1>
 
-    <div class="avatar-section">
-      <!-- Live camera feed -->
-      <video id="avatar-video" autoplay playsinline></video>
-    </div>
+<h1>Avatar Reaction Bot Demo</h1>
 
-    <div class="chat-section">
-      <textarea id="user-input" placeholder="Type your question..." rows="2"></textarea>
-      <button id="send-btn">Send</button>
-      <div id="chat-output"></div>
-    </div>
-  </div>
+<input type="file" id="video-upload" accept="video/*" />
+<video id="video-demo" width="400" height="300" controls></video>
+<canvas id="avatar-video" width="400" height="300"></canvas>
 
-  <script>
-    const sendBtn = document.getElementById('send-btn');
-    const userInput = document.getElementById('user-input');
-    const chatOutput = document.getElementById('chat-output');
-    const avatarVideo = document.getElementById('avatar-video');
+<div id="chat-output"></div>
+<button id="analyze-btn">Analyze & React</button>
 
-    // ✅ Step 1: Start camera feed
-    async function initCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        avatarVideo.srcObject = stream;
-      } catch (err) {
-        alert("Camera access denied or not available: " + err);
-      }
-    }
-    initCamera();
+<script>
+// Elements
+const videoUpload = document.getElementById('video-upload');
+const videoDemo = document.getElementById('video-demo');
+const avatarCanvas = document.getElementById('avatar-video');
+const ctx = avatarCanvas.getContext('2d');
+const chatOutput = document.getElementById('chat-output');
+const analyzeBtn = document.getElementById('analyze-btn');
 
-    // ✅ Step 2: Predefined Q&A responses
-    const responses = {
-      "hi": "Hello! I am your live avatar mentor 😎",
-      "how are you": "I am streaming from your camera and ready to chat!",
-      "hackathon": "This is a demo of a real-time talking avatar bot.",
-      "what is ai": "AI means Artificial Intelligence – machines that can think and learn.",
-      "bye": "Goodbye! See you again 👋"
-    };
+let uploadedVideo = null;
 
-    // ✅ Step 3: Function to make avatar speak
-    function speak(text) {
-      const speech = new SpeechSynthesisUtterance(text);
-      speech.lang = "en-US";
-      speech.rate = 1;   // 0.5 = slow, 1 = normal, 1.5+ = fast
-      speech.pitch = 1;  // Higher = funny voice, lower = deep
-      speechSynthesis.speak(speech);
-    }
+// Load video
+videoUpload.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    const url = URL.createObjectURL(file);
+    videoDemo.src = url;
+    uploadedVideo = file;
+  }
+});
 
-    // ✅ Step 4: Handle chat
-    sendBtn.addEventListener('click', () => {
-      const userText = userInput.value.trim().toLowerCase();
-      if (!userText) return;
+// Simple avatar drawing (lips move with speech)
+function drawAvatar(mouthOpen = 0) {
+  ctx.clearRect(0,0,avatarCanvas.width,avatarCanvas.height);
+  // Head
+  ctx.fillStyle = "#f5cba7";
+  ctx.beginPath();
+  ctx.arc(200,150,100,0,Math.PI*2);
+  ctx.fill();
+  // Eyes
+  ctx.fillStyle = "#000";
+  ctx.beginPath(); ctx.arc(160,120,10,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(240,120,10,0,Math.PI*2); ctx.fill();
+  // Mouth
+  ctx.fillStyle = "#900";
+  ctx.beginPath();
+  ctx.ellipse(200,200,50,mouthOpen,0,0,Math.PI*2);
+  ctx.fill();
+}
 
-      // Show user message
-      chatOutput.innerHTML += `<div style="color: #4caf50">You: ${userText}</div>`;
-      userInput.value = '';
+// Simulated speech recognition + mood detection
+async function analyzeVideo() {
+  if (!uploadedVideo) return alert("Upload a video first!");
+  
+  chatOutput.innerHTML += `<div style="color:#4caf50;">Analyzing video...</div>`;
+  
+  // Dummy speech-to-text (replace with real Whisper/Google STT)
+  const detectedText = "I am feeling happy and excited!";
+  chatOutput.innerHTML += `<div>Detected Speech: ${detectedText}</div>`;
+  
+  // Dummy mood detection (replace with real emotion model)
+  const moods = ["happy", "sad", "angry", "neutral"];
+  const detectedMood = moods[Math.floor(Math.random()*moods.length)];
+  chatOutput.innerHTML += `<div>Detected Mood: ${detectedMood}</div>`;
+  
+  // Avatar reacts
+  const reactionMap = {
+    happy: "Haha! I love your vibe 😎",
+    sad: "Oh no! Don't worry, stay strong 💪",
+    angry: "Take a deep breath 😤",
+    neutral: "Okay, got it! 😐"
+  };
+  const reactionText = reactionMap[detectedMood];
+  
+  // Animate avatar lips
+  let mouthOpen = 0;
+  const anim = setInterval(() => {
+    drawAvatar(mouthOpen);
+    mouthOpen = mouthOpen === 0 ? 30 : 0;
+  }, 400);
+  
+  // Speak reaction
+  const speech = new SpeechSynthesisUtterance(reactionText);
+  speech.lang = "en-US"; speech.rate=1; speech.pitch=1;
+  speechSynthesis.speak(speech);
+  speech.onend = () => clearInterval(anim);
+  
+  chatOutput.innerHTML += `<div>Avatar: ${reactionText}</div>`;
+  chatOutput.scrollTop = chatOutput.scrollHeight;
+}
 
-      // Generate reply
-      const reply = responses[userText] || "Sorry, I don't understand. Try another question.";
-      chatOutput.innerHTML += `<div>Avatar: ${reply}</div>`;
+analyzeBtn.addEventListener('click', analyzeVideo);
+</script>
 
-      // Avatar speaks reply
-      speak(reply);
-
-      chatOutput.scrollTop = chatOutput.scrollHeight;
-    });
-
-    // ✅ Extra: Press Enter to send
-    userInput.addEventListener("keypress", function(e) {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        sendBtn.click();
-      }
-    });
-  </script>
 </body>
 </html>
