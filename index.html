@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Real-Time Talking Avatar Bot</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #1e1e1e;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      width: 100%;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 30px;
+      margin-bottom: 20px;
+    }
+
+    .avatar-section {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    #avatar-video {
+      width: 400px;
+      border-radius: 12px;
+      background: black;
+    }
+
+    .chat-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    #user-input {
+      font-size: 20px;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      width: 100%;
+    }
+
+    #send-btn {
+      font-size: 20px;
+      padding: 10px;
+      background-color: #4caf50;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    #chat-output {
+      font-size: 20px;
+      min-height: 100px;
+      padding: 10px;
+      border-radius: 8px;
+      background-color: #333;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Real-Time Talking Avatar Mentor</h1>
+
+    <div class="avatar-section">
+      <!-- Live camera feed -->
+      <video id="avatar-video" autoplay playsinline></video>
+    </div>
+
+    <div class="chat-section">
+      <textarea id="user-input" placeholder="Type your question..." rows="2"></textarea>
+      <button id="send-btn">Send</button>
+      <div id="chat-output"></div>
+    </div>
+  </div>
+
+  <script>
+    const sendBtn = document.getElementById('send-btn');
+    const userInput = document.getElementById('user-input');
+    const chatOutput = document.getElementById('chat-output');
+    const avatarVideo = document.getElementById('avatar-video');
+
+    // ✅ Step 1: Start camera feed
+    async function initCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        avatarVideo.srcObject = stream;
+      } catch (err) {
+        alert("Camera access denied or not available: " + err);
+      }
+    }
+    initCamera();
+
+    // ✅ Step 2: Predefined Q&A responses
+    const responses = {
+      "hi": "Hello! I am your live avatar mentor 😎",
+      "how are you": "I am streaming from your camera and ready to chat!",
+      "hackathon": "This is a demo of a real-time talking avatar bot.",
+      "what is ai": "AI means Artificial Intelligence – machines that can think and learn.",
+      "bye": "Goodbye! See you again 👋"
+    };
+
+    // ✅ Step 3: Function to make avatar speak
+    function speak(text) {
+      const speech = new SpeechSynthesisUtterance(text);
+      speech.lang = "en-US";
+      speech.rate = 1;   // 0.5 = slow, 1 = normal, 1.5+ = fast
+      speech.pitch = 1;  // Higher = funny voice, lower = deep
+      speechSynthesis.speak(speech);
+    }
+
+    // ✅ Step 4: Handle chat
+    sendBtn.addEventListener('click', () => {
+      const userText = userInput.value.trim().toLowerCase();
+      if (!userText) return;
+
+      // Show user message
+      chatOutput.innerHTML += `<div style="color: #4caf50">You: ${userText}</div>`;
+      userInput.value = '';
+
+      // Generate reply
+      const reply = responses[userText] || "Sorry, I don't understand. Try another question.";
+      chatOutput.innerHTML += `<div>Avatar: ${reply}</div>`;
+
+      // Avatar speaks reply
+      speak(reply);
+
+      chatOutput.scrollTop = chatOutput.scrollHeight;
+    });
+
+    // ✅ Extra: Press Enter to send
+    userInput.addEventListener("keypress", function(e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        sendBtn.click();
+      }
+    });
+  </script>
+</body>
+</html>
